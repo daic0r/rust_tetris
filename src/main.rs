@@ -9,6 +9,7 @@ use std::time::Duration;
 use sdl2::video::Window;
 use sdl2::render::Canvas;
 use sdl2::rect::Rect;
+use std::time;
 use tetris::Piece;
 
 const PIXEL_SIZE: u32 = 16;
@@ -54,16 +55,21 @@ fn draw_block_absolute(canvas: &mut Canvas<Window>, x: i32, y: i32, color: Color
     canvas.fill_rect(rect);
 }
 
-fn draw_piece(pf: &PlayingField, canvas: &mut Canvas<Window>, i: i32, j: i32, piece: impl Piece) {
+fn draw_piece(pf: &PlayingField, canvas: &mut Canvas<Window>, x: i32, y: i32, piece: &dyn Piece) {
     let shape = piece.get_shape();
     let color = piece.get_color();
-    for i in 0..4 {
-        for j in 0..4 {
-            if shape[j][i] == '*' {
-                pf.draw_block(canvas, i as i32, j as i32, color);
+    for j in 0..4 {
+        for i in 0..4 {
+            if piece.get_shape().shape[j][i] == '*' {
+                pf.draw_block(canvas, x+i as i32, y+j as i32, color);
             }
         }
     } 
+}
+
+async fn game() {
+    //let cur_piece = tetris::make_random_piece();
+    //let mut i = 0;
 }
 
 pub fn main() {
@@ -76,6 +82,7 @@ pub fn main() {
         .unwrap();
 
     let mut canvas = window.into_canvas().build().unwrap();
+    //let mut sharedCanvas = Arc::new(Mutex::new(canvas));
 
     let pf = PlayingField::new(20, 20);
 
@@ -84,27 +91,64 @@ pub fn main() {
     canvas.present();
     let mut event_pump = sdl_context.event_pump().unwrap();
     let mut i = 0;
+    /*
+    let handle = task::spawn(async {
+        let mut cur_piece: Arc<dyn Piece> = tetris::make_random_piece();
+        loop {
+            let never = future::pending::<()>();
+            let duration = Duration::from_millis(800);
+            future::timeout(duration, never).await;
+
+        }
+    });
+    */
+    let mut now = time::Instant::now();
+    let mut elapsed = time::Duration::new(0, 0);
+    let mut cur_piece = tetris::make_random_piece();
+    let mut piece_pos = 0;
+
     'running: loop {
+        elapsed += now.elapsed();
+        now = time::Instant::now();
+        /*
         i = (i + 1) % 255;
-        canvas.set_draw_color(Color::RGB(i, 64, 255 - i));
-        canvas.clear();
+           {
+           let mut c = sharedCanvas.lock().unwrap();
+           c.set_draw_color(Color::RGB(i, 64, 255 - i));
+           c.clear();
+           }
+           */
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit {..} |
-                Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-                    break 'running
+                    Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
+                        break 'running
+                    },
+                Event::KeyDown { keycode: Some(Keycode::Space), .. } => {
+                    cur_piece.get_shape_mut().rotate();
                 },
                 _ => {}
             }
         }
         // The rest of the game loop goes here...
-        canvas.set_draw_color(Color::RGB(255,255,255));
+        canvas.set_draw_color(Color::RGB(0,0,0));
+        canvas.clear();
         pf.draw(&mut canvas);
 
-        let long = tetris::Zee{};
-        draw_piece(&pf, &mut canvas, 1, 1, long);
+        if elapsed > Duration::from_millis(800) {
+            elapsed = time::Duration::new(0, 0);
+            piece_pos += 1;
+        }
+        if piece_pos > 20 {
+            piece_pos = 0;
+            cur_piece = tetris::make_random_piece();
+        }
+        draw_piece(&pf, &mut canvas, 0, piece_pos, cur_piece.as_ref());
+
+        let cur_piece = tetris::make_random_piece();
+        //draw_piece(&pf, &mut canvas, 0, 0, cur_piece.as_ref().);
 
         canvas.present();
-        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
+        //::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
 }
