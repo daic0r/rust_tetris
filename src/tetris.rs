@@ -18,7 +18,29 @@ pub fn make_random_piece() -> Box<dyn Piece> {
 }
 
 #[derive(Clone, Default)]
-pub struct Bounds(u32, u32, u32, u32);
+pub struct Bounds(pub u32, pub u32, pub u32, pub u32);
+
+impl std::fmt::Debug for Bounds {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Bounds")
+            .field("left", &self.0)
+            .field("top", &self.1)
+            .field("right", &self.2)
+            .field("bottom", &self.3)
+            .finish()
+    }
+}
+
+pub struct Position(pub i32, pub i32);
+
+impl std::fmt::Debug for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Position")
+            .field("x", &self.0)
+            .field("y", &self.1)
+            .finish()
+    }
+}
 
 #[derive(Default)]
 pub struct Shape {
@@ -47,7 +69,7 @@ impl Shape {
         self.shape = new_shape;
     }
 
-    pub fn bounds(&self) -> Bounds {
+    pub fn get_bounds(&self) -> Bounds {
         let mut ret = Bounds(u32::MAX, u32::MAX, u32::MIN, u32::MIN);
         for j in 0..4 {
             for i in 0..4 {
@@ -73,6 +95,8 @@ impl Shape {
 }
 
 pub trait Piece {
+    fn get_position(&self) -> &Position;
+    fn get_position_mut(&mut self) -> &mut Position;
     fn get_color(&self) -> Color;
     fn get_shape(&self) -> &Shape;
     fn get_shape_mut(&mut self) -> &mut Shape;
@@ -81,9 +105,17 @@ pub trait Piece {
 macro_rules! impl_piece {
     ($name:ident, $color:expr, $shape:expr) => {
         pub struct $name {
-            shape: Shape
+            shape: Shape,
+            position: Position
         }
         impl Piece for $name {
+            fn get_position(&self) -> &Position {
+                &self.position
+            }
+            fn get_position_mut(&mut self) -> &mut Position {
+                &mut self.position
+            }
+
             fn get_color(&self) -> Color {
                 $color
             }
@@ -102,7 +134,8 @@ macro_rules! impl_piece {
                     shape: Shape {
                         shape: $shape,
                         alignment: 0
-                    }
+                    },
+                    position: Position(0, 0)
                 }
             } 
         }
@@ -159,31 +192,31 @@ mod tests {
     #[test]
     fn test_long_bounds() {
         let mut long = Long::new();
-        let bounds = long.get_shape().bounds();
+        let bounds = long.get_shape().get_bounds();
         assert_eq!(bounds.0, 0);
         assert_eq!(bounds.1, 1);
         assert_eq!(bounds.2, 3);
         assert_eq!(bounds.3, 1);
         long.get_shape_mut().rotate();
-        let bounds = long.get_shape().bounds();
+        let bounds = long.get_shape().get_bounds();
         assert_eq!(bounds.0, 2);
         assert_eq!(bounds.1, 0);
         assert_eq!(bounds.2, 2);
         assert_eq!(bounds.3, 3);
         long.get_shape_mut().rotate();
-        let bounds = long.get_shape().bounds();
+        let bounds = long.get_shape().get_bounds();
         assert_eq!(bounds.0, 0);
         assert_eq!(bounds.1, 2);
         assert_eq!(bounds.2, 3);
         assert_eq!(bounds.3, 2);
         long.get_shape_mut().rotate();
-        let bounds = long.get_shape().bounds();
+        let bounds = long.get_shape().get_bounds();
         assert_eq!(bounds.0, 1);
         assert_eq!(bounds.1, 0);
         assert_eq!(bounds.2, 1);
         assert_eq!(bounds.3, 3);
         long.get_shape_mut().rotate();
-        let bounds = long.get_shape().bounds();
+        let bounds = long.get_shape().get_bounds();
         assert_eq!(bounds.0, 0);
         assert_eq!(bounds.1, 1);
         assert_eq!(bounds.2, 3);
@@ -193,31 +226,31 @@ mod tests {
     #[test]
     fn test_square_bounds() {
         let mut square = Square::new();
-        let bounds = square.get_shape().bounds();
+        let bounds = square.get_shape().get_bounds();
         assert_eq!(bounds.0, 1);
         assert_eq!(bounds.1, 1);
         assert_eq!(bounds.2, 2);
         assert_eq!(bounds.3, 2);
         square.get_shape_mut().rotate();
-        let bounds = square.get_shape().bounds();
+        let bounds = square.get_shape().get_bounds();
         assert_eq!(bounds.0, 1);
         assert_eq!(bounds.1, 1);
         assert_eq!(bounds.2, 2);
         assert_eq!(bounds.3, 2);
         square.get_shape_mut().rotate();
-        let bounds = square.get_shape().bounds();
+        let bounds = square.get_shape().get_bounds();
         assert_eq!(bounds.0, 1);
         assert_eq!(bounds.1, 1);
         assert_eq!(bounds.2, 2);
         assert_eq!(bounds.3, 2);
         square.get_shape_mut().rotate();
-        let bounds = square.get_shape().bounds();
+        let bounds = square.get_shape().get_bounds();
         assert_eq!(bounds.0, 1);
         assert_eq!(bounds.1, 1);
         assert_eq!(bounds.2, 2);
         assert_eq!(bounds.3, 2);
         square.get_shape_mut().rotate();
-        let bounds = square.get_shape().bounds();
+        let bounds = square.get_shape().get_bounds();
         assert_eq!(bounds.0, 1);
         assert_eq!(bounds.1, 1);
         assert_eq!(bounds.2, 2);
@@ -227,32 +260,32 @@ mod tests {
     #[test]
     fn test_tee_bounds() {
         let mut tee = Tee::new();
-        let bounds = tee.get_shape().bounds();
+        let bounds = tee.get_shape().get_bounds();
         assert_eq!(bounds.0, 1);
         assert_eq!(bounds.1, 1);
         assert_eq!(bounds.2, 3);
         assert_eq!(bounds.3, 2);
         tee.get_shape_mut().rotate();
-        let bounds = tee.get_shape().bounds();
+        let bounds = tee.get_shape().get_bounds();
         assert_eq!(bounds.0, 1);
         assert_eq!(bounds.1, 0);
         assert_eq!(bounds.2, 2);
         assert_eq!(bounds.3, 2);
         /*
         tee.get_shape_mut().rotate();
-        let bounds = tee.get_shape().bounds();
+        let bounds = tee.get_shape().get_bounds();
         assert_eq!(bounds.0, 0);
         assert_eq!(bounds.1, 1);
         assert_eq!(bounds.2, 1);
         assert_eq!(bounds.3, 3);
         tee.get_shape_mut().rotate();
-        let bounds = tee.get_shape().bounds();
+        let bounds = tee.get_shape().get_bounds();
         assert_eq!(bounds.0, 1);
         assert_eq!(bounds.1, 1);
         assert_eq!(bounds.2, 1);
         assert_eq!(bounds.3, 2);
         tee.get_shape_mut().rotate();
-        let bounds = tee.get_shape().bounds();
+        let bounds = tee.get_shape().get_bounds();
         assert_eq!(bounds.0, 1);
         assert_eq!(bounds.1, 1);
         assert_eq!(bounds.2, 2);

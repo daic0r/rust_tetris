@@ -17,6 +17,13 @@ const PIXEL_SIZE: u32 = 16;
 struct PlayingField {
     base_x: i32,
     base_y: i32,
+    field: [[Option<Color>; Self::WIDTH_BLOCKS as usize]; Self::HEIGHT_BLOCKS as usize],
+}
+
+enum Direction {
+    Left,
+    Right,
+    Bottom
 }
 
 impl PlayingField {
@@ -24,10 +31,10 @@ impl PlayingField {
     const HEIGHT_BLOCKS: u32 = 20;
 
     fn new(x: i32, y: i32) -> Self {
-        PlayingField{ base_x: x, base_y: y }
+        PlayingField{ base_x: x, base_y: y, field: [[None; Self::WIDTH_BLOCKS as usize]; Self::HEIGHT_BLOCKS as usize] }
     }
 
-    fn draw(&self, canvas: &mut Canvas<Window>) {
+    fn draw_bounds(&self, canvas: &mut Canvas<Window>) {
         let bound_x = (Self::WIDTH_BLOCKS as i32);
         let bound_y = (Self::HEIGHT_BLOCKS as i32);
         for j in 0i32..bound_y {
@@ -44,6 +51,62 @@ impl PlayingField {
         let from_y = self.base_y + (j as i32) * (PIXEL_SIZE as i32);
         draw_block_absolute(canvas, from_x, from_y, color);
     }
+
+    fn draw(&self, canvas: &mut Canvas<Window>) {
+        self.draw_bounds(canvas);
+        for j in 0..Self::HEIGHT_BLOCKS {
+            for i in 0..Self::WIDTH_BLOCKS {
+                if let Some(color) = self.field[j as usize][i as usize] {
+                    self.draw_block(canvas, i as i32, j as i32, color);
+                }
+            }
+        }
+    }
+
+    fn test_collision(&self, piece: &dyn Piece, dir: Direction) -> bool {
+        let bounds = piece.get_shape().get_bounds();
+        println!("Bounds: {:?}", bounds);
+        println!("piece.position =  {:?}", piece.get_position());
+        let check_line = piece.get_position().1 + (bounds.3 as i32);
+        if check_line < 0 {
+            return false;
+        } else
+            if check_line >= Self::HEIGHT_BLOCKS as i32 {
+                return true;
+            }
+        for i in piece.get_position().0..piece.get_position().0+piece.get_shape().get_bounds().2 as i32 {
+            if i-piece.get_position().0 < 0 {
+                continue;
+            } else
+                if piece.get_shape().shape[bounds.3 as usize][(i-piece.get_position().0) as usize] == '*' {
+                    if let Some(_) = self.field[check_line as usize][i as usize] {
+                        println!("Collide!");
+                        return true;
+                    }
+                }
+        }
+        false
+    }
+
+    fn place_piece(&mut self, piece: Box<dyn Piece>) {
+        println!("{:?}", piece.get_position());
+        for j in 0..4 {
+            for i in 0..4 {
+                let y = (piece.get_position().1 + j) as usize;
+                if y >= Self::HEIGHT_BLOCKS as usize {
+                    break;
+                }
+                let x = (piece.get_position().0 + i) as usize;
+                if x >= Self::WIDTH_BLOCKS as usize {
+                    continue;
+                }
+                if piece.get_shape().shape[j as usize][i as usize] == '*' {
+                    self.field[y][x] = Some(piece.get_color());
+                }
+            }
+        }
+    }
+
 }
 
 fn draw_block_absolute(canvas: &mut Canvas<Window>, x: i32, y: i32, color: Color) {
@@ -55,7 +118,7 @@ fn draw_block_absolute(canvas: &mut Canvas<Window>, x: i32, y: i32, color: Color
     canvas.fill_rect(rect);
 }
 
-fn draw_piece(pf: &PlayingField, canvas: &mut Canvas<Window>, x: i32, y: i32, piece: &dyn Piece) {
+fn draw_piece_ex(pf: &PlayingField, canvas: &mut Canvas<Window>, x: i32, y: i32, piece: &dyn Piece) {
     let shape = piece.get_shape();
     let color = piece.get_color();
     for j in 0..4 {
@@ -65,6 +128,10 @@ fn draw_piece(pf: &PlayingField, canvas: &mut Canvas<Window>, x: i32, y: i32, pi
             }
         }
     } 
+}
+
+fn draw_piece(pf: &PlayingField, canvas: &mut Canvas<Window>, piece: &dyn Piece) {
+    draw_piece_ex(pf, canvas, piece.get_position().0, piece.get_position().1, piece);
 }
 
 async fn game() {
@@ -84,7 +151,7 @@ pub fn main() {
     let mut canvas = window.into_canvas().build().unwrap();
     //let mut sharedCanvas = Arc::new(Mutex::new(canvas));
 
-    let pf = PlayingField::new(20, 20);
+    let mut pf = PlayingField::new(20, 20);
 
     canvas.set_draw_color(Color::RGB(0, 255, 255));
     canvas.clear();
@@ -135,17 +202,19 @@ pub fn main() {
         canvas.clear();
         pf.draw(&mut canvas);
 
-        if elapsed > Duration::from_millis(800) {
+        if elapsed > Duration::from_millis(100) {
             elapsed = time::Duration::new(0, 0);
-            piece_pos += 1;
+            cur_piece.get_position_mut().1 += 1;
+            let collide = pf.test_collision(cur_piece.as_ref(), Direction::Bottom);
+            if collide || (cur_piece.get_position().1 + (cur_piece.get_shape().get_bounds().3 as i32) > 19) {
+                cur_piece.get_position_mut().1 -= 1;
+                pf.place_piece(cur_piece); 
+                cur_piece = tetris::make_random_piece();
+            }
         }
-        if piece_pos > 20 {
-            piece_pos = 0;
-            cur_piece = tetris::make_random_piece();
-        }
-        draw_piece(&pf, &mut canvas, 0, piece_pos, cur_piece.as_ref());
+        draw_piece(&pf, &mut canvas, cur_piece.as_ref());
 
-        let cur_piece = tetris::make_random_piece();
+        //let cur_piece = tetris::make_random_piece();
         //draw_piece(&pf, &mut canvas, 0, 0, cur_piece.as_ref().);
 
         canvas.present();
